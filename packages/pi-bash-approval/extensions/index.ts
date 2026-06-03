@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 
-import type { BashApprovalConfig } from "./models";
+import type { ApprovalCtx, BashApprovalConfig } from "./models";
 import {
   applyChoice,
   BLOCKED_BY_USER,
@@ -11,8 +11,31 @@ import {
   loadConfig,
 } from "./utils";
 
+function formatInvalidPatternsMessage(
+  invalidPatterns: readonly string[],
+): string {
+  return `Ignored ${invalidPatterns.length} invalid regex pattern(s):\n  - ${invalidPatterns.join("\n  - ")}`;
+}
+
+function notifyInvalidPatterns(
+  invalidPatterns: readonly string[],
+  ctx: ApprovalCtx,
+): void {
+  if (invalidPatterns.length === 0) {
+    return;
+  }
+
+  ctx.ui.notify(formatInvalidPatternsMessage(invalidPatterns), "error");
+}
+
 export default function (pi: ExtensionAPI) {
   let config: BashApprovalConfig = loadConfig();
+
+  if (config.invalidPatterns.length > 0) {
+    console.warn(
+      `[pi-bash-approval] ${formatInvalidPatternsMessage(config.invalidPatterns)}`,
+    );
+  }
 
   pi.registerCommand("bash-approval-reload", {
     description:
@@ -24,6 +47,7 @@ export default function (pi: ExtensionAPI) {
         `Reloaded ${config.allowed.length} bash approval rule(s)`,
         "info",
       );
+      notifyInvalidPatterns(config.invalidPatterns, ctx);
     },
   });
 
@@ -33,6 +57,7 @@ export default function (pi: ExtensionAPI) {
     handler: async (_args, ctx) => {
       if (config.allowed.length === 0) {
         ctx.ui.notify("No bash approval rules configured", "info");
+        notifyInvalidPatterns(config.invalidPatterns, ctx);
         return;
       }
 
@@ -40,6 +65,7 @@ export default function (pi: ExtensionAPI) {
         `Allowed bash patterns:\n  - ${config.allowed.join("\n  - ")}`,
         "info",
       );
+      notifyInvalidPatterns(config.invalidPatterns, ctx);
     },
   });
 

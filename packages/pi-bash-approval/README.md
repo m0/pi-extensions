@@ -48,16 +48,39 @@ Blank lines and `#` comment lines are ignored.
 
 ### Pattern syntax (`.bash-approval` lines)
 
-| Pattern        | Matches                                            |
-| -------------- | -------------------------------------------------- |
-| `ls`           | exact: `ls` only                                   |
-| `ls:*`         | `ls` exactly, or `ls <anything>` (space-separated) |
-| `git status:*` | `git status` exactly, or `git status <anything>`   |
-| `git*`         | trailing-`*` glob: any command starting with `git` |
+| Pattern                   | Matches                                            |
+| ------------------------- | -------------------------------------------------- |
+| `ls`                      | exact: `ls` only                                   |
+| `ls:*`                    | `ls` exactly, or `ls <anything>` (space-separated) |
+| `git status:*`            | `git status` exactly, or `git status <anything>`   |
+| `git*`                    | trailing-`*` glob: any command starting with `git` |
+| `regex:^git (log\|diff)$` | regex full-match: `git log` or `git diff` only     |
 
 `:*` form is recommended: requires exact match or trailing space, so
 `git status:*` does **not** match `git statusfoo`. Bare `*` form is raw prefix
 match. Use sparingly.
+
+#### `regex:` patterns
+
+Lines starting with `regex:` are compiled as JavaScript regular expressions.
+Power-user feature for cases the simpler forms cannot express (alternation,
+optional segments, character classes).
+
+- Patterns are implicitly wrapped in `^(?:...)$` — always **full-match**, never
+  substring. Use `.*` explicitly if you want partial matching.
+- Always case-sensitive, single-line. No flag syntax.
+- Match runs against **normalized** command segments (same as all other pattern
+  types): variable assignments, shell control keywords, and redirections are
+  stripped before matching. For example, `regex:^git push$` matches
+  `FOO=bar git push`.
+- Invalid patterns (e.g. `regex:[unclosed`) are silently dropped on load. The
+  extension logs a warning to `console.warn` at startup and surfaces them via
+  `/bash-approval-list` and `/bash-approval-reload`.
+- No ReDoS protection. Avoid catastrophic-backtracking constructs like
+  `(a+)+` — the allow-list runs in the same process as the agent.
+- Regex patterns are not auto-suggested by the approval prompt; add them by
+  editing `~/.pi/agent/.bash-approval` directly and running
+  `/bash-approval-reload`.
 
 ### `splitChains`
 

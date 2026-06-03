@@ -7,6 +7,7 @@ import type {
   BashApprovalConfig,
   BashApprovalSettings,
   CommandEvaluation,
+  CompiledRule,
   GlobalSettings,
   PromptOptions,
   SplitState,
@@ -16,10 +17,7 @@ const CONFIG_DIR = path.join(os.homedir(), ".pi", "agent");
 const SETTINGS_PATH = path.join(CONFIG_DIR, "settings.json");
 const ALLOW_LIST_PATH = path.join(CONFIG_DIR, ".bash-approval");
 
-const DEFAULT_CONFIG: BashApprovalConfig = {
-  allowed: [],
-  splitChains: true,
-};
+const DEFAULT_SPLIT_CHAINS = true;
 
 const PREFIX_GLOB_SUFFIX_LENGTH = 2;
 const TRAILING_GLOB_SUFFIX_LENGTH = 1;
@@ -30,6 +28,7 @@ export const DENY = "Deny";
 export const BLOCKED_BY_USER = "Blocked by user";
 
 const COMMENT_PREFIX = "#";
+const REGEX_PREFIX = "regex:";
 const VARIABLE_ASSIGNMENT_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const REDIRECTION_OPERATOR_PATTERN =
   /^(?:\d*)?(?:<|>|>>|<>|>&|<&|<<|<<<|&>|&>>)$/;
@@ -93,7 +92,7 @@ function sanitizeSplitChains(value: unknown): boolean {
     return value;
   }
 
-  return DEFAULT_CONFIG.splitChains;
+  return DEFAULT_SPLIT_CHAINS;
 }
 
 function parseGlobalSettings(raw: string): Partial<GlobalSettings> {
@@ -120,7 +119,7 @@ function loadSplitChainsSetting(): boolean {
 
     return sanitizeSplitChains(bashApprovalSettings.splitChains);
   } catch {
-    return DEFAULT_CONFIG.splitChains;
+    return DEFAULT_SPLIT_CHAINS;
   }
 }
 
@@ -155,45 +154,97 @@ function loadAllowList(): string[] {
   }
 }
 
+function compileRule(pattern: string): CompiledRule | null {
+  if (!pattern) {
+    return null;
+  }
+
+  if (pattern.startsWith(REGEX_PREFIX)) {
+    const body = pattern.slice(REGEX_PREFIX.length);
+
+    if (!body) {
+      return null;
+    }
+
+    try {
+      return {
+        kind: "regex",
+        raw: pattern,
+        regex: new RegExp(`^(?:${body})$`),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  if (pattern.endsWith(":*")) {
+    const prefix = pattern.slice(0, -PREFIX_GLOB_SUFFIX_LENGTH).trim();
+
+    if (!prefix) {
+      return null;
+    }
+
+    return { kind: "prefixGlob", raw: pattern, prefix };
+  }
+
+  if (pattern.endsWith("*")) {
+    return {
+      kind: "trailingGlob",
+      raw: pattern,
+      prefix: pattern.slice(0, -TRAILING_GLOB_SUFFIX_LENGTH),
+    };
+  }
+
+  return { kind: "exact", raw: pattern, literal: pattern };
+}
+
+function buildRules(allowed: readonly string[]): {
+  compiledRules: CompiledRule[];
+  invalidPatterns: string[];
+} {
+  const compiledRules: CompiledRule[] = [];
+  const invalidPatterns: string[] = [];
+
+  for (const pattern of allowed) {
+    const compiled = compileRule(pattern);
+
+    if (compiled) {
+      compiledRules.push(compiled);
+      continue;
+    }
+
+    if (pattern.startsWith(REGEX_PREFIX)) {
+      invalidPatterns.push(pattern);
+    }
+  }
+
+  return { compiledRules, invalidPatterns };
+}
+
 export function loadConfig(): BashApprovalConfig {
   const splitChains = loadSplitChainsSetting();
   const allowed = loadAllowList();
+  const { compiledRules, invalidPatterns } = buildRules(allowed);
 
   return {
     allowed,
     splitChains,
+    compiledRules,
+    invalidPatterns,
   };
 }
 
-function matchesPrefixGlob(command: string, pattern: string): boolean {
-  const prefix = pattern.slice(0, -PREFIX_GLOB_SUFFIX_LENGTH).trim();
-
-  if (!prefix) {
-    return false;
+function matchesRule(command: string, rule: CompiledRule): boolean {
+  switch (rule.kind) {
+    case "exact":
+      return command === rule.literal;
+    case "prefixGlob":
+      return command === rule.prefix || command.startsWith(`${rule.prefix} `);
+    case "trailingGlob":
+      return command.startsWith(rule.prefix);
+    case "regex":
+      return rule.regex.test(command);
   }
-
-  return command === prefix || command.startsWith(`${prefix} `);
-}
-
-function matchesPattern(command: string, pattern: string): boolean {
-  const trimmedCommand = command.trim();
-  const trimmedPattern = pattern.trim();
-
-  if (!trimmedPattern) {
-    return false;
-  }
-
-  if (trimmedPattern.endsWith(":*")) {
-    return matchesPrefixGlob(trimmedCommand, trimmedPattern);
-  }
-
-  if (trimmedPattern.endsWith("*")) {
-    const prefix = trimmedPattern.slice(0, -TRAILING_GLOB_SUFFIX_LENGTH);
-
-    return trimmedCommand.startsWith(prefix);
-  }
-
-  return trimmedCommand === trimmedPattern;
 }
 
 function isDoubleSeparator(
@@ -637,11 +688,11 @@ function suggestPrefixPattern(command: string): string | null {
 
 function firstFailingSegment(
   segments: readonly string[],
-  rules: readonly string[],
+  rules: readonly CompiledRule[],
 ): string | null {
   return (
     segments.find(
-      (segment) => !rules.some((rule) => matchesPattern(segment, rule)),
+      (segment) => !rules.some((rule) => matchesRule(segment, rule)),
     ) ?? null
   );
 }
@@ -662,7 +713,7 @@ export function evaluateCommand(
     return { allMatch: true };
   }
 
-  const failingSegment = firstFailingSegment(segments, config.allowed);
+  const failingSegment = firstFailingSegment(segments, config.compiledRules);
 
   if (!failingSegment) {
     return { allMatch: true };
@@ -714,6 +765,12 @@ function persistRule(
   }
 
   config.allowed.push(rule);
+
+  const compiled = compileRule(rule);
+
+  if (compiled) {
+    config.compiledRules.push(compiled);
+  }
 
   try {
     fs.mkdirSync(CONFIG_DIR, { recursive: true });

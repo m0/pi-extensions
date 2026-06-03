@@ -6,7 +6,14 @@
  *   npm run test:coverage  # with coverage report
  */
 
-import { describe, expect, it, jest } from "@jest/globals";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from "@jest/globals";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -994,6 +1001,116 @@ describe("bash-approval extension", () => {
       );
 
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe("regex pattern matching", () => {
+    let consoleWarnSpy: jest.SpiedFunction<typeof console.warn>;
+
+    beforeEach(() => {
+      consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleWarnSpy.mockRestore();
+    });
+
+    it("permits commands matching a regex: pattern (alternation)", async () => {
+      const { toolCallHandler } = setup({
+        allowListFile: "regex:^git (log|status)$\n",
+      });
+
+      expect(
+        await toolCallHandler!(bashEvent("git log"), makeCtx().ctx),
+      ).toBeUndefined();
+      expect(
+        await toolCallHandler!(bashEvent("git status"), makeCtx().ctx),
+      ).toBeUndefined();
+    });
+
+    it("blocks commands that do not match the regex", async () => {
+      const { toolCallHandler } = setup({
+        allowListFile: "regex:^git (log|status)$\n",
+      });
+      const result = await toolCallHandler!(
+        bashEvent("git push"),
+        makeCtx({ hasUI: false }).ctx,
+      );
+
+      expect(result).toMatchObject({ block: true });
+    });
+
+    it("anchors patterns implicitly (no substring match)", async () => {
+      const { toolCallHandler } = setup({
+        allowListFile: "regex:git\n",
+      });
+      const result = await toolCallHandler!(
+        bashEvent("mygit"),
+        makeCtx({ hasUI: false }).ctx,
+      );
+
+      expect(result).toMatchObject({ block: true });
+    });
+
+    it("discards invalid regex patterns and reports them via /bash-approval-list", async () => {
+      const { toolCallHandler, commands } = setup({
+        allowListFile: "regex:[unclosed\nls\n",
+      });
+
+      const blocked = await toolCallHandler!(
+        bashEvent("anything-else"),
+        makeCtx({ hasUI: false }).ctx,
+      );
+      expect(blocked).toMatchObject({ block: true });
+
+      const passed = await toolCallHandler!(bashEvent("ls"), makeCtx().ctx);
+      expect(passed).toBeUndefined();
+
+      const { ctx, notify } = makeCtx();
+      await commands.get("bash-approval-list")!("", ctx);
+      const errorCall = notify.mock.calls.find(
+        ([, level]) => level === "error",
+      );
+      expect(errorCall?.[0]).toContain("regex:[unclosed");
+    });
+
+    it("evaluates each segment of a chain against regex patterns", async () => {
+      const { toolCallHandler } = setup({
+        allowListFile: "regex:^git log( .*)?$\n",
+      });
+      const result = await toolCallHandler!(
+        bashEvent("git log && rm -rf /"),
+        makeCtx({ hasUI: false }).ctx,
+      );
+
+      expect(result).toMatchObject({ block: true });
+      expect((result as { reason: string }).reason).toContain("rm -rf /");
+    });
+
+    it("matches against normalized segments (assignment prefix stripped)", async () => {
+      const { toolCallHandler } = setup({
+        allowListFile: "regex:^git push$\n",
+      });
+      const result = await toolCallHandler!(
+        bashEvent("FOO=bar git push"),
+        makeCtx().ctx,
+      );
+
+      expect(result).toBeUndefined();
+    });
+
+    it("reload reports invalid regex patterns via notify", async () => {
+      const { commands } = setup({
+        allowListFile: "regex:[bad\n",
+      });
+      const { ctx, notify } = makeCtx();
+
+      await commands.get("bash-approval-reload")!("", ctx);
+
+      const errorCall = notify.mock.calls.find(
+        ([, level]) => level === "error",
+      );
+      expect(errorCall?.[0]).toContain("regex:[bad");
     });
   });
 

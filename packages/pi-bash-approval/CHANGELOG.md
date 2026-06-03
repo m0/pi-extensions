@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `regex:` pattern support to the allow-list. Lines starting with `regex:` are compiled as JavaScript regular expressions and matched against the normalized command segment with an implicit `^(?:...)$` anchor. Invalid patterns are dropped on load and surfaced via `console.warn`, `/bash-approval-reload`, and `/bash-approval-list`.
 - Evaluate command substitutions inside assignment tokens by their inner command so approval suggestions no longer offer invalid flags like `-d ...):*` for commands such as `tmp=$(mktemp -d ...)`, and assignment-prefixed commands also check setup substitutions like `FOO=$(./setup) npm test`.
 
 ## 0.2.2

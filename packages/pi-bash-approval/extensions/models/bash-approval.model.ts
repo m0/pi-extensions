@@ -1,6 +1,22 @@
+export type CompiledRule =
+  | { readonly kind: "exact"; readonly raw: string; readonly literal: string }
+  | {
+      readonly kind: "prefixGlob";
+      readonly raw: string;
+      readonly prefix: string;
+    }
+  | {
+      readonly kind: "trailingGlob";
+      readonly raw: string;
+      readonly prefix: string;
+    }
+  | { readonly kind: "regex"; readonly raw: string; readonly regex: RegExp };
+
 export type BashApprovalConfig = {
   allowed: string[];
   splitChains: boolean;
+  compiledRules: CompiledRule[];
+  invalidPatterns: string[];
 };
 
 export type BashApprovalSettings = {
