@@ -1,9 +1,0 @@
-{
-  "name": "@fgladisch/pi-caveman",
-  "version": "0.2.0",
-  "description": "Always-on caveman mode extension for Pi",
-  "license": "MIT",
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
-  }
-}

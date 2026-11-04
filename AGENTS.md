@@ -74,7 +74,7 @@ This repo is a workspace for pi (`@earendil-works/pi-coding-agent`) extension pa
 
 Package-local type aliases/models live under `packages/pi-*/extensions/models/*.model.ts`; package-local enums live under `packages/pi-*/extensions/models/*.enum.ts`. Each `models/index.ts` is the package-local barrel. Extension code should import models and enums from `./models`, not from individual model files. Do not recreate legacy `extensions/types.ts` files.
 
-**Extension hooks in use** (see [packages/pi-caveman/extensions/index.ts](packages/pi-caveman/extensions/index.ts) for the canonical `registerCommand` example and [packages/pi-zsh-shell/extensions/index.ts](packages/pi-zsh-shell/extensions/index.ts) for an event-hook example):
+**Extension hooks in use** (see [packages/pi-footer/extensions/index.ts](packages/pi-footer/extensions/index.ts) for the canonical `registerCommand` example and [packages/pi-zsh-shell/extensions/index.ts](packages/pi-zsh-shell/extensions/index.ts) for an event-hook example):
 
 - `pi.registerCommand(name, { description, handler })` — adds a `/<name>` slash command
 - `pi.on(<event>, handler)` — subscribe to lifecycle and tool events; fall through (bare `return`) to allow, `{ block: true, reason }` to deny
