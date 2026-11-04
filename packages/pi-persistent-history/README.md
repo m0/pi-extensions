@@ -17,6 +17,7 @@ pi install ./packages/pi-persistent-history
 - Creates the file owner-only (`0600`) since prompts can contain secrets; consider adding `.pi/input-history.jsonl` to the target project's `.gitignore`
 - Refuses to write when the history file is a symlink (a repo-controlled symlink could otherwise redirect writes into arbitrary files)
 - Writes atomically (sibling temp file + rename), so a crash mid-write cannot truncate the existing history
+- Composes with an editor factory registered by an earlier extension (e.g. pi-footer's prompt input editor) instead of silently replacing it. Extensions load alphabetically, which puts `pi-footer` first; a non-alphabetical load order where pi-footer loads after this package would replace the composed factory
 - Re-injection (`/new`, resume, `/history-reload`) skips entries the editor already carries, so up/down recall stays duplicate-free
 - Captures prompts from `input` events (including slash commands)
 - Skips consecutive duplicates

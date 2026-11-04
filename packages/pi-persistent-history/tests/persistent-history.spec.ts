@@ -96,10 +96,10 @@ function makeCtx(options: CtxOptions = {}) {
       }
     });
   const focusedComponent =
-    options.focusedEditor ??
-    ({ addToHistory, history: editorHistory } as {
-      addToHistory: (text: string) => void;
-    });
+    "focusedEditor" in options
+      ? options.focusedEditor
+      : ({ addToHistory, history: editorHistory } as unknown);
+  const getEditorComponent = jest.fn((): unknown => undefined);
 
   const setEditorComponent = jest.fn((factory: unknown) => {
     if (typeof factory !== "function") {
@@ -117,10 +117,11 @@ function makeCtx(options: CtxOptions = {}) {
     ui: {
       notify,
       setEditorComponent,
+      getEditorComponent,
     },
   };
 
-  return { ctx, notify, setEditorComponent, addToHistory };
+  return { ctx, notify, setEditorComponent, getEditorComponent, addToHistory };
 }
 
 function setup(): Recorded {
@@ -322,6 +323,33 @@ describe("persistent-history extension", () => {
     await recorded.inputHandler!({ text: "hello", source: "interactive" }, ctx);
 
     expect(recorded.fs.renameSync).not.toHaveBeenCalled();
+  });
+
+  it("composes with a previously registered editor factory", async () => {
+    const recorded = setup();
+    recorded.fs.readFileSync.mockImplementation((filePath: unknown) => {
+      if (filePath === GLOBAL_SETTINGS_PATH) {
+        return JSON.stringify({});
+      }
+
+      if (filePath === HISTORY_FILE_PATH) {
+        return `${JSON.stringify({ text: "new", timestamp: 2000 })}\n${JSON.stringify({ text: "old", timestamp: 1000 })}\n`;
+      }
+
+      return "";
+    });
+
+    const previousEditor = {
+      addToHistory: jest.fn(),
+      history: [] as string[],
+    };
+    const { ctx, getEditorComponent } = makeCtx({ focusedEditor: undefined });
+    getEditorComponent.mockReturnValue(() => previousEditor);
+
+    await recorded.sessionStartHandler!({ reason: "startup" }, ctx);
+
+    expect(previousEditor.addToHistory).toHaveBeenNthCalledWith(1, "old");
+    expect(previousEditor.addToHistory).toHaveBeenNthCalledWith(2, "new");
   });
 
   it("injects loaded JSONL history into focused editor on session_start", async () => {

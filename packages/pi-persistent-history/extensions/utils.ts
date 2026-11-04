@@ -325,44 +325,34 @@ export function injectHistoryIntoFocusedEditor(
     message: "Focused editor not available",
   };
 
-  ui.setEditorComponent((tui, theme, keybindings) => {
-    const focusedComponent = (tui as unknown as FocusedTui).focusedComponent;
+  // Compose with an editor factory another extension already registered
+  // (e.g. pi-footer's prompt input editor) instead of silently replacing it;
+  // setEditorComponent only keeps one factory, last call wins.
+  const previous = ui.getEditorComponent?.();
 
-    if (!isHistoryEditor(focusedComponent)) {
-      result = {
-        status: InjectionStatus.Unavailable,
-        message: "Focused editor has no addToHistory()",
-      };
-
-      if (focusedComponent && typeof focusedComponent === "object") {
-        return focusedComponent as EditorComponent;
-      }
-
-      return new CustomEditor(tui, theme, keybindings);
-    }
-
+  const tryInject = (editor: HistoryEditor): boolean => {
     try {
       // Re-injection (session_start, /history-reload) hits the same editor
       // instance; addToHistory only dedupes consecutive entries, so skip
       // everything the editor already carries.
-      const existing = new Set(focusedComponent.history ?? []);
+      const existing = new Set(editor.history ?? []);
 
       for (let index = entries.length - 1; index >= 0; index--) {
         const entry = entries.at(index);
 
         if (entry && !existing.has(entry)) {
-          focusedComponent.addToHistory?.(entry);
+          editor.addToHistory?.(entry);
         }
       }
+
+      preventSelfReferentialShortcutFallback(editor);
 
       result = {
         status: InjectionStatus.Applied,
         message: `Injected ${entries.length} entries`,
       };
 
-      preventSelfReferentialShortcutFallback(focusedComponent);
-
-      return focusedComponent;
+      return true;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -371,8 +361,45 @@ export function injectHistoryIntoFocusedEditor(
         message: `Injection failed: ${message}`,
       };
 
+      return false;
+    }
+  };
+
+  ui.setEditorComponent((tui, theme, keybindings) => {
+    const focusedComponent = (tui as unknown as FocusedTui).focusedComponent;
+
+    // A live focused editor keeps its in-progress text on re-injection.
+    if (focusedComponent && typeof focusedComponent === "object") {
+      if (!isHistoryEditor(focusedComponent)) {
+        result = {
+          status: InjectionStatus.Unavailable,
+          message: "Focused editor has no addToHistory()",
+        };
+
+        return focusedComponent as EditorComponent;
+      }
+
+      if (tryInject(focusedComponent)) {
+        return focusedComponent;
+      }
+
       return new CustomEditor(tui, theme, keybindings);
     }
+
+    const composed =
+      previous?.(tui, theme, keybindings) ??
+      new CustomEditor(tui, theme, keybindings);
+
+    if (isHistoryEditor(composed)) {
+      tryInject(composed);
+    } else {
+      result = {
+        status: InjectionStatus.Unavailable,
+        message: "Editor has no addToHistory()",
+      };
+    }
+
+    return composed;
   });
 
   return result;
