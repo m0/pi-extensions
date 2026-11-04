@@ -33,6 +33,7 @@ jest.mock("node:fs", () => ({
   readFileSync: jest.fn(),
   writeFileSync: jest.fn(),
   mkdirSync: jest.fn(),
+  lstatSync: jest.fn(),
 }));
 
 const HISTORY_FILE_PATH = "/tmp/project/.pi/input-history.jsonl";
@@ -59,6 +60,7 @@ type FsMock = {
   readFileSync: jest.Mock<(...args: unknown[]) => unknown>;
   writeFileSync: jest.Mock<(...args: unknown[]) => unknown>;
   mkdirSync: jest.Mock<(...args: unknown[]) => unknown>;
+  lstatSync: jest.Mock<(...args: unknown[]) => unknown>;
 };
 
 type Recorded = {
@@ -114,6 +116,10 @@ function setup(): Recorded {
   fs.readFileSync.mockReset();
   fs.writeFileSync.mockReset();
   fs.mkdirSync.mockReset();
+  fs.lstatSync.mockReset();
+  fs.lstatSync.mockImplementation(() => {
+    throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+  });
 
   const recorded: Recorded = {
     inputHandler: null,
@@ -239,6 +245,32 @@ describe("persistent-history extension", () => {
 
     expect(lines.map((line) => line.text)).toEqual(["hello"]);
     expect(lines.at(0)?.timestamp).toEqual(expect.any(Number));
+  });
+
+  it("refuses to persist through a symlinked history file", async () => {
+    const recorded = setup();
+    const { ctx } = makeCtx();
+
+    recorded.fs.lstatSync.mockReturnValue({
+      isSymbolicLink: () => true,
+    });
+
+    await recorded.inputHandler!({ text: "hello", source: "interactive" }, ctx);
+
+    expect(recorded.fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it("rethrows lstat errors other than ENOENT and skips the write", async () => {
+    const recorded = setup();
+    const { ctx } = makeCtx();
+
+    recorded.fs.lstatSync.mockImplementation(() => {
+      throw Object.assign(new Error("EACCES"), { code: "EACCES" });
+    });
+
+    await recorded.inputHandler!({ text: "hello", source: "interactive" }, ctx);
+
+    expect(recorded.fs.writeFileSync).not.toHaveBeenCalled();
   });
 
   it("injects loaded JSONL history into focused editor on session_start", async () => {

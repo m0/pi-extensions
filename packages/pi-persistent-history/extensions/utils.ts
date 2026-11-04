@@ -200,6 +200,18 @@ export function persistHistory(
 ): void {
   ensureDirectory(filePath);
 
+  // A repo-controlled symlink at the history path could redirect writes into
+  // arbitrary files (e.g. ~/.zshenv) — refuse instead of following it.
+  try {
+    if (fs.lstatSync(filePath).isSymbolicLink()) {
+      throw new Error(`Refusing to write through symlink: ${filePath}`);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+
   const lines = entries.map((entry) => {
     const historyLine: HistoryLine = {
       text: entry,
