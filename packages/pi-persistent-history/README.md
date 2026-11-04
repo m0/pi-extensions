@@ -14,6 +14,7 @@ pi install ./packages/pi-persistent-history
 
 - Stores history in `<project>/.pi/input-history.jsonl`
 - Writes each line with prompt text + Unix timestamp (milliseconds)
+- Creates the file owner-only (`0600`) since prompts can contain secrets; consider adding `.pi/input-history.jsonl` to the target project's `.gitignore`
 - Captures prompts from `input` events (including slash commands)
 - Skips consecutive duplicates
 - Reads `maxEntries` only from `~/.pi/agent/settings.json` at `persistentHistory.maxEntries` (default `250`)

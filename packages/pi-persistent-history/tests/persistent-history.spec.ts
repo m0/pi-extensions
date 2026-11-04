@@ -230,8 +230,10 @@ describe("persistent-history extension", () => {
 
     expect(recorded.fs.writeFileSync).toHaveBeenCalledTimes(1);
 
-    const [filePath, raw] = recorded.fs.writeFileSync.mock.calls.at(-1)!;
+    const [filePath, raw, options] =
+      recorded.fs.writeFileSync.mock.calls.at(-1)!;
     expect(filePath).toBe(HISTORY_FILE_PATH);
+    expect(options).toEqual({ encoding: "utf8", mode: 0o600 });
 
     const lines = parseJsonlLines(raw as string);
 
@@ -503,11 +505,10 @@ describe("persistent-history utils", () => {
     expect(fs.mkdirSync).toHaveBeenCalledWith("/tmp/project/.pi", {
       recursive: true,
     });
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      HISTORY_FILE_PATH,
-      "",
-      "utf8",
-    );
+    expect(fs.writeFileSync).toHaveBeenCalledWith(HISTORY_FILE_PATH, "", {
+      encoding: "utf8",
+      mode: 0o600,
+    });
   });
 
   it("falls back to defaults on malformed settings and malformed history lines", () => {

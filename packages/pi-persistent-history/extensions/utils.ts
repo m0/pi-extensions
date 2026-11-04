@@ -211,7 +211,8 @@ export function persistHistory(
 
   const content = lines.length > 0 ? `${lines.join("\n")}\n` : "";
 
-  fs.writeFileSync(filePath, content, "utf8");
+  // Prompts can contain secrets, so the history file stays owner-only.
+  fs.writeFileSync(filePath, content, { encoding: "utf8", mode: 0o600 });
 }
 
 export function persistRuntime(cwd: string, runtime: RuntimeState): void {
