@@ -11,8 +11,10 @@ logo header.
 
 ## Install
 
+From a checkout of this repo:
+
 ```bash
-pi install npm:@fgladisch/pi-welcome-message
+pi install ./packages/pi-welcome-message
 ```
 
 ## Example

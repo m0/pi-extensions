@@ -4,8 +4,10 @@ Persist Pi prompt input history per project.
 
 ## Install
 
+From a checkout of this repo:
+
 ```bash
-pi install npm:@fgladisch/pi-persistent-history
+pi install ./packages/pi-persistent-history
 ```
 
 ## Behavior

@@ -16,11 +16,11 @@ Footer items render in the active theme's text color over the theme's `customMes
 
 ## Install
 
-```bash
-pi install npm:@fgladisch/pi-footer
-```
+From a checkout of this repo:
 
-Or use from this workspace with Pi extension package discovery.
+```bash
+pi install ./packages/pi-footer
+```
 
 ## Configuration
 

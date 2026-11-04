@@ -9,8 +9,10 @@ commands are blocked with a reason pointing at the config files.
 
 ## Install
 
+From a checkout of this repo:
+
 ```bash
-pi install npm:@fgladisch/pi-bash-approval
+pi install ./packages/pi-bash-approval
 ```
 
 ## Config

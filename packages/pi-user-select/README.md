@@ -8,8 +8,10 @@ between mutually exclusive paths instead of guessing.
 
 ## Install
 
+From a checkout of this repo:
+
 ```bash
-pi install npm:@fgladisch/pi-user-select
+pi install ./packages/pi-user-select
 ```
 
 No slash commands. One optional setting (see [Config](#config)).

@@ -7,8 +7,10 @@ burns ~75% fewer output tokens.
 
 ## Install
 
+From a checkout of this repo:
+
 ```bash
-pi install npm:@fgladisch/pi-caveman
+pi install ./packages/pi-caveman
 ```
 
 ## First-time setup

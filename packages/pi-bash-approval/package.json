@@ -2,22 +2,8 @@
   "name": "@fgladisch/pi-bash-approval",
   "version": "0.3.0",
   "description": "Interactive allow-list guard for Pi bash tool calls",
-  "keywords": [
-    "pi-package"
-  ],
   "license": "MIT",
-  "files": [
-    "extensions",
-    "README.md"
-  ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/fgladisch/pi-extensions.git"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }
