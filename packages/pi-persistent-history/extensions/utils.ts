@@ -194,14 +194,9 @@ function ensureDirectory(filePath: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
-export function persistHistory(
-  filePath: string,
-  entries: readonly string[],
-): void {
-  ensureDirectory(filePath);
-
-  // A repo-controlled symlink at the history path could redirect writes into
-  // arbitrary files (e.g. ~/.zshenv) — refuse instead of following it.
+// A repo-controlled symlink at the history path could redirect writes into
+// arbitrary files (e.g. ~/.zshenv) — refuse instead of following it.
+function refuseSymlink(filePath: string): void {
   try {
     if (fs.lstatSync(filePath).isSymbolicLink()) {
       throw new Error(`Refusing to write through symlink: ${filePath}`);
@@ -211,6 +206,17 @@ export function persistHistory(
       throw error;
     }
   }
+}
+
+export function persistHistory(
+  filePath: string,
+  entries: readonly string[],
+): void {
+  ensureDirectory(filePath);
+
+  const tmpPath = `${filePath}.tmp`;
+  refuseSymlink(filePath);
+  refuseSymlink(tmpPath);
 
   const lines = entries.map((entry) => {
     const historyLine: HistoryLine = {
@@ -223,8 +229,10 @@ export function persistHistory(
 
   const content = lines.length > 0 ? `${lines.join("\n")}\n` : "";
 
-  // Prompts can contain secrets, so the history file stays owner-only.
-  fs.writeFileSync(filePath, content, { encoding: "utf8", mode: 0o600 });
+  // Write via a sibling temp file and rename so a crash mid-write cannot
+  // truncate the existing history.
+  fs.writeFileSync(tmpPath, content, { encoding: "utf8", mode: 0o600 });
+  fs.renameSync(tmpPath, filePath);
 }
 
 export function persistRuntime(cwd: string, runtime: RuntimeState): void {

@@ -34,9 +34,11 @@ jest.mock("node:fs", () => ({
   writeFileSync: jest.fn(),
   mkdirSync: jest.fn(),
   lstatSync: jest.fn(),
+  renameSync: jest.fn(),
 }));
 
 const HISTORY_FILE_PATH = "/tmp/project/.pi/input-history.jsonl";
+const HISTORY_TMP_PATH = `${HISTORY_FILE_PATH}.tmp`;
 const GLOBAL_SETTINGS_PATH = path.join(
   os.homedir(),
   ".pi",
@@ -61,6 +63,7 @@ type FsMock = {
   writeFileSync: jest.Mock<(...args: unknown[]) => unknown>;
   mkdirSync: jest.Mock<(...args: unknown[]) => unknown>;
   lstatSync: jest.Mock<(...args: unknown[]) => unknown>;
+  renameSync: jest.Mock<(...args: unknown[]) => unknown>;
 };
 
 type Recorded = {
@@ -132,6 +135,7 @@ function setup(): Recorded {
   fs.lstatSync.mockImplementation(() => {
     throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
   });
+  fs.renameSync.mockReset();
 
   const recorded: Recorded = {
     inputHandler: null,
@@ -250,8 +254,12 @@ describe("persistent-history extension", () => {
 
     const [filePath, raw, options] =
       recorded.fs.writeFileSync.mock.calls.at(-1)!;
-    expect(filePath).toBe(HISTORY_FILE_PATH);
+    expect(filePath).toBe(HISTORY_TMP_PATH);
     expect(options).toEqual({ encoding: "utf8", mode: 0o600 });
+    expect(recorded.fs.renameSync).toHaveBeenCalledWith(
+      HISTORY_TMP_PATH,
+      HISTORY_FILE_PATH,
+    );
 
     const lines = parseJsonlLines(raw as string);
 
@@ -283,6 +291,37 @@ describe("persistent-history extension", () => {
     await recorded.inputHandler!({ text: "hello", source: "interactive" }, ctx);
 
     expect(recorded.fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it("refuses to persist through a symlinked temp file", async () => {
+    const recorded = setup();
+    const { ctx } = makeCtx();
+
+    recorded.fs.lstatSync.mockImplementation((path: unknown) => {
+      if (path === HISTORY_TMP_PATH) {
+        return { isSymbolicLink: () => true };
+      }
+
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    });
+
+    await recorded.inputHandler!({ text: "hello", source: "interactive" }, ctx);
+
+    expect(recorded.fs.writeFileSync).not.toHaveBeenCalled();
+    expect(recorded.fs.renameSync).not.toHaveBeenCalled();
+  });
+
+  it("leaves the existing file untouched when the temp write fails", async () => {
+    const recorded = setup();
+    const { ctx } = makeCtx();
+
+    recorded.fs.writeFileSync.mockImplementation(() => {
+      throw new Error("ENOSPC");
+    });
+
+    await recorded.inputHandler!({ text: "hello", source: "interactive" }, ctx);
+
+    expect(recorded.fs.renameSync).not.toHaveBeenCalled();
   });
 
   it("injects loaded JSONL history into focused editor on session_start", async () => {
@@ -574,10 +613,14 @@ describe("persistent-history utils", () => {
     expect(fs.mkdirSync).toHaveBeenCalledWith("/tmp/project/.pi", {
       recursive: true,
     });
-    expect(fs.writeFileSync).toHaveBeenCalledWith(HISTORY_FILE_PATH, "", {
+    expect(fs.writeFileSync).toHaveBeenCalledWith(HISTORY_TMP_PATH, "", {
       encoding: "utf8",
       mode: 0o600,
     });
+    expect(fs.renameSync).toHaveBeenCalledWith(
+      HISTORY_TMP_PATH,
+      HISTORY_FILE_PATH,
+    );
   });
 
   it("falls back to defaults on malformed settings and malformed history lines", () => {
