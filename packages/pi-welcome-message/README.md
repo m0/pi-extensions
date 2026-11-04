@@ -9,6 +9,11 @@ message renders without a custom background, wraps long lines to the terminal
 width while preserving leading indentation, and can show a centered gradient Pi
 logo header.
 
+The summary is renderer-only: it rides in the message's `details` metadata,
+which stays out of the LLM context. The LLM-visible `content` field is empty,
+so repo-controlled strings (package.json fields, branch names, commit subjects)
+cannot be injected into the conversation via the welcome message.
+
 ## Install
 
 From a checkout of this repo:

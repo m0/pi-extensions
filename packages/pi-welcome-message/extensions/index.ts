@@ -6,7 +6,11 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 
-import { WelcomeLogoColor, type WelcomeMessageHeader } from "./models";
+import {
+  WelcomeLogoColor,
+  type WelcomeMessageDetails,
+  type WelcomeMessageHeader,
+} from "./models";
 import {
   buildGitInfo,
   buildPackageInfo,
@@ -67,16 +71,20 @@ export default function (pi: ExtensionAPI): void {
 
     pi.sendMessage({
       customType: "welcome",
-      content: summaryOutput ?? "",
+      // `content` participates in the LLM context; the summary is built from
+      // repo-controlled strings (package.json fields, branch, commit subjects)
+      // and must stay renderer-only, so it rides in `details` instead.
+      content: "",
       display: true,
       details: {
+        summary: summaryOutput ?? "",
         header: welcomeConfig.showLogo
           ? {
               modelId: model?.id ?? "no model selected",
               logoColor: welcomeConfig.logoColor,
             }
           : null,
-      },
+      } satisfies WelcomeMessageDetails,
     });
   });
 }
@@ -84,7 +92,7 @@ export default function (pi: ExtensionAPI): void {
 function registerWelcomeRenderer(pi: ExtensionAPI): void {
   pi.registerMessageRenderer("welcome", (message, _options, _theme) => {
     const text = new RenderWidthWelcomeText(
-      parseWelcomeSummary(message.content),
+      parseWelcomeSummary(message.details, message.content),
       parseWelcomeHeader(message.details),
     );
     const box = new Box(1, 1, (token) => token);
@@ -95,7 +103,17 @@ function registerWelcomeRenderer(pi: ExtensionAPI): void {
   });
 }
 
-function parseWelcomeSummary(content: unknown): string {
+function parseWelcomeSummary(details: unknown, content: unknown): string {
+  if (details && typeof details === "object") {
+    const { summary } = details as { readonly summary?: unknown };
+
+    if (typeof summary === "string") {
+      return summary;
+    }
+  }
+
+  // Session entries persisted before the summary moved into `details` still
+  // carry it in the LLM-visible `content` field.
   return typeof content === "string" ? content : "Welcome";
 }
 
