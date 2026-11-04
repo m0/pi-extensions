@@ -334,10 +334,15 @@ export function injectHistoryIntoFocusedEditor(
     }
 
     try {
+      // Re-injection (session_start, /history-reload) hits the same editor
+      // instance; addToHistory only dedupes consecutive entries, so skip
+      // everything the editor already carries.
+      const existing = new Set(focusedComponent.history ?? []);
+
       for (let index = entries.length - 1; index >= 0; index--) {
         const entry = entries.at(index);
 
-        if (entry) {
+        if (entry && !existing.has(entry)) {
           focusedComponent.addToHistory?.(entry);
         }
       }

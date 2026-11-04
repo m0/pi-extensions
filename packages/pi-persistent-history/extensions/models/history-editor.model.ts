@@ -6,6 +6,7 @@ export type FocusedTui = {
 
 export type HistoryEditor = EditorComponent & {
   readonly addToHistory?: (text: string) => void;
+  readonly history?: readonly string[];
 };
 
 export type CustomEditorLike = HistoryEditor & {

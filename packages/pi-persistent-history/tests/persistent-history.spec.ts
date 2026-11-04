@@ -80,11 +80,23 @@ type CtxOptions = {
 
 function makeCtx(options: CtxOptions = {}) {
   const notify = jest.fn();
+  // Mirrors the real editor's addToHistory: trim, skip consecutive
+  // duplicates, keep history in `history` so re-injection can dedupe.
+  const editorHistory: string[] = [];
   const addToHistory =
-    options.addToHistory ?? jest.fn<(text: string) => void>();
+    options.addToHistory ??
+    jest.fn((text: string) => {
+      const trimmed = text.trim();
+
+      if (trimmed && editorHistory[0] !== trimmed) {
+        editorHistory.unshift(trimmed);
+      }
+    });
   const focusedComponent =
     options.focusedEditor ??
-    ({ addToHistory } as { addToHistory: (text: string) => void });
+    ({ addToHistory, history: editorHistory } as {
+      addToHistory: (text: string) => void;
+    });
 
   const setEditorComponent = jest.fn((factory: unknown) => {
     if (typeof factory !== "function") {
@@ -301,6 +313,31 @@ describe("persistent-history extension", () => {
       display: true,
     });
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("re-injection into the same editor does not duplicate entries", async () => {
+    const recorded = setup();
+    recorded.fs.readFileSync.mockImplementation((filePath: unknown) => {
+      if (filePath === GLOBAL_SETTINGS_PATH) {
+        return JSON.stringify({});
+      }
+
+      if (filePath === HISTORY_FILE_PATH) {
+        return `${JSON.stringify({ text: "new", timestamp: 2000 })}\n${JSON.stringify({ text: "old", timestamp: 1000 })}\n`;
+      }
+
+      return "";
+    });
+
+    const { ctx, addToHistory } = makeCtx();
+
+    await recorded.sessionStartHandler!({ reason: "startup" }, ctx);
+    const reload = recorded.commands.get("history-reload")!;
+    await reload("", ctx);
+
+    expect(addToHistory).toHaveBeenCalledTimes(2);
+    expect(addToHistory).toHaveBeenNthCalledWith(1, "old");
+    expect(addToHistory).toHaveBeenNthCalledWith(2, "new");
   });
 
   it("keeps slash commands and skips only consecutive duplicates", async () => {
