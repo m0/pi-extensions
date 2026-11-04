@@ -1,7 +1,6 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/pi-bash-approval" },
     { "path": "./packages/pi-caveman" },
     { "path": "./packages/pi-footer" },
     { "path": "./packages/pi-user-select" },

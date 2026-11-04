@@ -74,17 +74,17 @@ This repo is a workspace for pi (`@earendil-works/pi-coding-agent`) extension pa
 
 Package-local type aliases/models live under `packages/pi-*/extensions/models/*.model.ts`; package-local enums live under `packages/pi-*/extensions/models/*.enum.ts`. Each `models/index.ts` is the package-local barrel. Extension code should import models and enums from `./models`, not from individual model files. Do not recreate legacy `extensions/types.ts` files.
 
-**Extension hooks in use** (see [packages/pi-bash-approval/extensions/index.ts](packages/pi-bash-approval/extensions/index.ts) for the canonical example):
+**Extension hooks in use** (see [packages/pi-caveman/extensions/index.ts](packages/pi-caveman/extensions/index.ts) for the canonical `registerCommand` example and [packages/pi-zsh-shell/extensions/index.ts](packages/pi-zsh-shell/extensions/index.ts) for an event-hook example):
 
 - `pi.registerCommand(name, { description, handler })` — adds a `/<name>` slash command
-- `pi.on("tool_call", handler)` — intercepts tool calls; fall through (bare `return`) to allow, `{ block: true, reason }` to deny
+- `pi.on(<event>, handler)` — subscribe to lifecycle and tool events; fall through (bare `return`) to allow, `{ block: true, reason }` to deny
 
 **Extension contexts**:
 
 - Interactive (TUI): `ctx.hasUI === true` and `ctx.ui.{select, notify, ...}` is available
 - Non-interactive (e.g. `pi -p`): `ctx.hasUI === false`. Extensions must not call `ctx.ui.select` and should fall back to a safe default (typically: block)
 
-**Config files** live under `~/.pi/agent/` when an extension needs persistent settings. Some extensions read shared `~/.pi/agent/settings.json`; others use package-specific files such as `~/.pi/agent/.bash-approval`, `~/.pi/agent/footer.json`, or `~/.pi/agent/zsh-functions`. Config-driven extensions should expose a reload/status command when runtime reload is useful.
+**Config files** live under `~/.pi/agent/` when an extension needs persistent settings. Some extensions read shared `~/.pi/agent/settings.json`; others use package-specific files such as `~/.pi/agent/footer.json` or `~/.pi/agent/zsh-functions`. Config-driven extensions should expose a reload/status command when runtime reload is useful.
 
 ## Testing
 
@@ -95,7 +95,7 @@ Tests use Jest + ts-jest and live under `packages/<pkg>/tests/<feature>.spec.ts`
 - One spec file per extension, named to match.
 - Mock `@earendil-works/pi-coding-agent` with `jest.mock(..., { virtual: true })` — it's ESM-only and Jest's CJS resolver can't load it. Stub only the helpers your extension imports (e.g. `isToolCallEventType`).
 - Mock `node:fs` rather than touching the real filesystem.
-- Provide a `setup()` helper that resets modules, applies fs mocks, calls the extension's default export against a fake `pi` API, and returns the recorded `tool_call` handler and registered commands. See [packages/pi-bash-approval/tests/bash-approval.spec.ts](packages/pi-bash-approval/tests/bash-approval.spec.ts) for the canonical pattern.
+- Provide a `setup()` helper that resets modules, applies fs mocks, calls the extension's default export against a fake `pi` API, and returns the recorded event handlers and registered commands. See [packages/pi-persistent-history/tests/persistent-history.spec.ts](packages/pi-persistent-history/tests/persistent-history.spec.ts) for the canonical pattern.
 - Build a `makeCtx()` helper that returns `{ ctx, notify, select }` with `ctx.hasUI` togglable and `select` driven by an injected `pick` function — this keeps interactive tests readable.
 
 **Coverage**: thresholds are 80% lines/branches/functions/statements. Coverage collection uses the `packages/*/extensions/**/*.ts` glob in [jest.config.cjs](jest.config.cjs), so new package extensions are picked up automatically.
