@@ -2,9 +2,7 @@
 
 Minimal configurable footer and prompt input extension for Pi.
 
-Replaces the prompt editor component with a styled-prefix wrapper. Load it
-before extensions that compose over the editor factory (pi-persistent-history
-does this automatically; extensions load alphabetically by default).
+Replaces the prompt editor component with a styled-prefix wrapper.
 
 Default prompt input prefix:
 

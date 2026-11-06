@@ -95,7 +95,7 @@ Tests use Jest + ts-jest and live under `packages/<pkg>/tests/<feature>.spec.ts`
 - One spec file per extension, named to match.
 - Mock `@earendil-works/pi-coding-agent` with `jest.mock(..., { virtual: true })` — it's ESM-only and Jest's CJS resolver can't load it. Stub only the helpers your extension imports (e.g. `isToolCallEventType`).
 - Mock `node:fs` rather than touching the real filesystem.
-- Provide a `setup()` helper that resets modules, applies fs mocks, calls the extension's default export against a fake `pi` API, and returns the recorded event handlers and registered commands. See [packages/pi-persistent-history/tests/persistent-history.spec.ts](packages/pi-persistent-history/tests/persistent-history.spec.ts) for the canonical pattern.
+- Provide a `setup()` helper that resets modules, applies fs mocks, calls the extension's default export against a fake `pi` API, and returns the recorded event handlers and registered commands. See [packages/pi-user-select/tests/user-select.spec.ts](packages/pi-user-select/tests/user-select.spec.ts) for the canonical pattern.
 - Build a `makeCtx()` helper that returns `{ ctx, notify, select }` with `ctx.hasUI` togglable and `select` driven by an injected `pick` function — this keeps interactive tests readable.
 
 **Coverage**: thresholds are 80% lines/branches/functions/statements. Coverage collection uses the `packages/*/extensions/**/*.ts` glob in [jest.config.cjs](jest.config.cjs), so new package extensions are picked up automatically.
