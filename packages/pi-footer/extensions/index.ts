@@ -2,6 +2,7 @@ import {
   CustomEditor,
   ExtensionContext,
   type ExtensionAPI,
+  type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import * as path from "node:path";
@@ -30,14 +31,17 @@ class PromptInputEditor extends CustomEditor {
     tui: ConstructorParameters<typeof CustomEditor>[0],
     theme: ConstructorParameters<typeof CustomEditor>[1],
     keybindings: ConstructorParameters<typeof CustomEditor>[2],
-    private readonly styledPromptInputPrefix: string,
+    private readonly promptInputPrefix: string,
+    private readonly uiTheme: Theme,
   ) {
     super(tui, theme, keybindings);
   }
 
   override render(width: number): string[] {
-    const prefix = this.styledPromptInputPrefix
-      ? `${this.styledPromptInputPrefix}${PROMPT_PREFIX_GAP}`
+    // Styled per render via the live theme proxy so theme switches apply
+    // without re-registering the editor.
+    const prefix = this.promptInputPrefix
+      ? `${this.uiTheme.fg("accent", this.promptInputPrefix)}${PROMPT_PREFIX_GAP}`
       : "";
     const prefixWidth = visibleWidth(prefix);
     const editorWidth = Math.max(1, width - prefixWidth);
@@ -76,13 +80,15 @@ export default function (pi: ExtensionAPI): void {
 
     const projectName = path.basename(ctx.cwd) || ROOT_WORKSPACE_FALLBACK;
 
-    const styledPromptInputPrefix = currentConfig.promptInput.prefix
-      ? ctx.ui.theme.fg("accent", currentConfig.promptInput.prefix)
-      : "";
-
     ctx.ui.setEditorComponent(
       (tui, theme, keybindings) =>
-        new PromptInputEditor(tui, theme, keybindings, styledPromptInputPrefix),
+        new PromptInputEditor(
+          tui,
+          theme,
+          keybindings,
+          currentConfig.promptInput.prefix,
+          ctx.ui.theme,
+        ),
     );
 
     ctx.ui.setFooter((tui, theme, footerData) => {

@@ -556,6 +556,8 @@ describe("pi-footer extension", () => {
     await trigger(handlers, "session_start", { reason: "startup" }, ctx);
 
     expect(ctx.ui.setEditorComponent).toHaveBeenCalledTimes(1);
+    // Styling happens at render time, not at registration time.
+    expect(ctx.ui.theme.fg).not.toHaveBeenCalled();
     const editor = getEditorFactory(ctx)({ requestRender: jest.fn() }, {}, {});
 
     expect(editor.render(20)).toEqual([
@@ -564,6 +566,29 @@ describe("pi-footer extension", () => {
       "  ──────────────────",
     ]);
     expect(ctx.ui.theme.fg).toHaveBeenCalledWith("accent", "➜");
+  });
+
+  it("re-styles the prompt prefix after a theme change", async () => {
+    (fs.readFile as jest.Mock<any>).mockResolvedValue(
+      JSON.stringify({ promptInput: { prefix: "➜" } }),
+    );
+    const { handlers } = setup();
+    const ctx = makeContext();
+
+    await trigger(handlers, "session_start", { reason: "startup" }, ctx);
+
+    const fg = ctx.ui.theme.fg as unknown as jest.Mock<
+      (_color: "accent", text: string) => string
+    >;
+    fg.mockImplementation(
+      (_color: "accent", text: string) => `<magenta>${text}`,
+    );
+    const editor = getEditorFactory(ctx)({ requestRender: jest.fn() }, {}, {});
+
+    expect(editor.render(20)[1]).toContain("<magenta>➜");
+
+    fg.mockImplementation((_color: "accent", text: string) => `<cyan>${text}`);
+    expect(editor.render(20)[1]).toContain("<cyan>➜");
   });
 
   it("renders extension statuses after the branch with the configured separator", async () => {
