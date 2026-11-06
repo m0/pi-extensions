@@ -40,7 +40,8 @@ pi install ./packages/pi-welcome-message
 
 ## Configuration (`~/.pi/agent/settings.json`)
 
-Configure the welcome message through `welcomeMessage`.
+Configure the welcome message through `welcomeMessage`. A malformed
+`settings.json` falls back to defaults and shows a warning notification.
 
 ```json
 {

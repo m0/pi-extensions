@@ -17,23 +17,37 @@ type GlobalSettings = {
   readonly userSelect?: { readonly notifyHerdr?: unknown };
 };
 
-export function loadNotifyHerdr(): boolean {
+export function loadNotifyHerdr(): { value: boolean; malformed: boolean } {
+  let raw: string;
+
   try {
-    const parsed = JSON.parse(
-      fs.readFileSync(SETTINGS_PATH, "utf8"),
-    ) as Partial<GlobalSettings>;
-    const { userSelect } = parsed;
-
-    if (!userSelect || typeof userSelect !== "object") {
-      return DEFAULT_NOTIFY_HERDR;
-    }
-
-    return typeof userSelect.notifyHerdr === "boolean"
-      ? userSelect.notifyHerdr
-      : DEFAULT_NOTIFY_HERDR;
+    raw = fs.readFileSync(SETTINGS_PATH, "utf8");
   } catch {
-    return DEFAULT_NOTIFY_HERDR;
+    // Absent settings file is a fresh install, not an error to report.
+    return { value: DEFAULT_NOTIFY_HERDR, malformed: false };
   }
+
+  let parsed: Partial<GlobalSettings>;
+
+  try {
+    parsed = JSON.parse(raw) as Partial<GlobalSettings>;
+  } catch {
+    return { value: DEFAULT_NOTIFY_HERDR, malformed: true };
+  }
+
+  const { userSelect } = parsed;
+
+  if (!userSelect || typeof userSelect !== "object") {
+    return { value: DEFAULT_NOTIFY_HERDR, malformed: false };
+  }
+
+  return {
+    value:
+      typeof userSelect.notifyHerdr === "boolean"
+        ? userSelect.notifyHerdr
+        : DEFAULT_NOTIFY_HERDR,
+    malformed: false,
+  };
 }
 
 const CUSTOM_ANSWER_LABEL = "(Type custom answer)";

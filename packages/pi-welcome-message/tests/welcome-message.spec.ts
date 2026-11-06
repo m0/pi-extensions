@@ -143,6 +143,8 @@ function setup() {
 }
 
 function makeCtx(hasUI: boolean = true, modelId: string = "test-model") {
+  const notify = jest.fn();
+
   return {
     hasUI,
     cwd: "/test/cwd",
@@ -150,6 +152,7 @@ function makeCtx(hasUI: boolean = true, modelId: string = "test-model") {
       id: modelId,
     },
     ui: {
+      notify,
       theme: {
         bold: (s: string) => `**${s}**`,
         italic: (s: string) => `_${s}_`,
@@ -236,6 +239,46 @@ describe("welcome-message extension", () => {
     const { pi, triggerSessionStart } = setup();
     await triggerSessionStart({ reason: "startup" }, makeCtx(false));
     expect(pi.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("notifies and uses defaults when settings.json is malformed", async () => {
+    const { pi, triggerSessionStart } = setup();
+
+    (fs.readFile as jest.Mock<any>).mockImplementation((filePath: string) => {
+      if (filePath === "/home/test/.pi/agent/settings.json") {
+        return Promise.resolve("not json");
+      }
+
+      return Promise.reject(new Error("ENOENT"));
+    });
+    (pi.exec as jest.Mock<any>).mockResolvedValue({ code: 1, stdout: "" });
+
+    const ctx = makeCtx();
+    await triggerSessionStart({ reason: "startup" }, ctx);
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("malformed"),
+      "warning",
+    );
+    expect(pi.sendMessage).toHaveBeenCalledWith({
+      customType: "welcome",
+      content: "",
+      display: true,
+      details: expect.any(Object),
+    });
+  });
+
+  it("does not notify when settings.json is absent", async () => {
+    const { pi, triggerSessionStart } = setup();
+
+    (fs.readFile as jest.Mock<any>).mockRejectedValue(new Error("ENOENT"));
+    (pi.exec as jest.Mock<any>).mockResolvedValue({ code: 1, stdout: "" });
+
+    const ctx = makeCtx();
+    await triggerSessionStart({ reason: "startup" }, ctx);
+
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
+    expect(pi.sendMessage).toHaveBeenCalled();
   });
 
   it("renders welcome message with package.json and clean git", async () => {

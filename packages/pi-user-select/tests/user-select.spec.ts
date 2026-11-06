@@ -1055,5 +1055,52 @@ describe("user-select extension", () => {
         ).toBe(false);
       }
     });
+
+    it("notifies once when settings.json is malformed", async () => {
+      const recorded = setup(undefined, "not json");
+      const tool = recorded.tools.get("user_select")!;
+      const { ctx, notify } = makeCtx({
+        pickOption: (options) => options.at(0),
+      });
+
+      await tool.execute(
+        "id",
+        { question: "Pick one", options: SAMPLE_OPTIONS },
+        null,
+        null,
+        ctx,
+      );
+      await tool.execute(
+        "id",
+        { question: "Pick two", options: SAMPLE_OPTIONS },
+        null,
+        null,
+        ctx,
+      );
+
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith(
+        expect.stringContaining("malformed"),
+        "warning",
+      );
+    });
+
+    it("does not notify when settings.json is absent", async () => {
+      const recorded = setup();
+      const tool = recorded.tools.get("user_select")!;
+      const { ctx, notify } = makeCtx({
+        pickOption: (options) => options.at(0),
+      });
+
+      await tool.execute(
+        "id",
+        { question: "Pick one", options: SAMPLE_OPTIONS },
+        null,
+        null,
+        ctx,
+      );
+
+      expect(notify).not.toHaveBeenCalled();
+    });
   });
 });

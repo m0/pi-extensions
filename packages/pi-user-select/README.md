@@ -22,7 +22,9 @@ No slash commands. One optional setting (see [Config](#config)).
 
 ## Config
 
-Optional. Read from `~/.pi/agent/settings.json` under `userSelect`:
+Optional. Read from `~/.pi/agent/settings.json` under `userSelect`. A malformed
+`settings.json` falls back to defaults and shows a warning notification on the
+first `user_select` call:
 
 ```json
 {

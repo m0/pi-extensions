@@ -14,6 +14,7 @@ import {
   type PackageSource,
   type Rgb,
   type Theme,
+  type WelcomeConfigLoadResult,
   type WelcomeExtensionAPI,
   type WelcomeMessageConfig,
   type WelcomeMessageSettings,
@@ -231,13 +232,37 @@ function isLogoColor(value: string): value is WelcomeLogoColor {
   return Object.values(WelcomeLogoColor).includes(value as WelcomeLogoColor);
 }
 
-export async function loadWelcomeMessageConfig(): Promise<WelcomeMessageConfig> {
-  try {
-    const rawSettings = await fs.readFile(SETTINGS_PATH, "utf8");
-    const parsedSettings = parseGlobalSettings(rawSettings);
-    const welcomeMessageSettings = getWelcomeMessageSettings(parsedSettings);
+function defaultWelcomeConfig(): WelcomeMessageConfig {
+  return {
+    sections: { ...DEFAULT_ENABLED_WELCOME_SECTIONS },
+    showLogo: DEFAULT_SHOW_LOGO,
+    showOnNewSession: DEFAULT_SHOW_ON_NEW_SESSION,
+    logoColor: DEFAULT_LOGO_COLOR,
+  };
+}
 
-    return {
+export async function loadWelcomeMessageConfig(): Promise<WelcomeConfigLoadResult> {
+  let rawSettings: string;
+
+  try {
+    rawSettings = await fs.readFile(SETTINGS_PATH, "utf8");
+  } catch {
+    // Absent settings file is a fresh install, not an error to report.
+    return { config: defaultWelcomeConfig(), settingsMalformed: false };
+  }
+
+  let parsedSettings: Partial<GlobalSettings>;
+
+  try {
+    parsedSettings = parseGlobalSettings(rawSettings);
+  } catch {
+    return { config: defaultWelcomeConfig(), settingsMalformed: true };
+  }
+
+  const welcomeMessageSettings = getWelcomeMessageSettings(parsedSettings);
+
+  return {
+    config: {
       sections: sanitizeEnabledWelcomeSections(welcomeMessageSettings.sections),
       showLogo: sanitizeBooleanSetting(
         welcomeMessageSettings.showLogo,
@@ -248,15 +273,9 @@ export async function loadWelcomeMessageConfig(): Promise<WelcomeMessageConfig> 
         DEFAULT_SHOW_ON_NEW_SESSION,
       ),
       logoColor: sanitizeLogoColor(welcomeMessageSettings.logoColor),
-    };
-  } catch {
-    return {
-      sections: { ...DEFAULT_ENABLED_WELCOME_SECTIONS },
-      showLogo: DEFAULT_SHOW_LOGO,
-      showOnNewSession: DEFAULT_SHOW_ON_NEW_SESSION,
-      logoColor: DEFAULT_LOGO_COLOR,
-    };
-  }
+    },
+    settingsMalformed: false,
+  };
 }
 
 export async function buildPackageInfo(

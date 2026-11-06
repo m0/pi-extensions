@@ -13,6 +13,11 @@ export type WelcomeMessageConfig = {
   readonly logoColor: WelcomeLogoColor;
 };
 
+export type WelcomeConfigLoadResult = {
+  readonly config: WelcomeMessageConfig;
+  readonly settingsMalformed: boolean;
+};
+
 export type WelcomeMessageSettings = {
   sections?: unknown;
   showLogo?: unknown;

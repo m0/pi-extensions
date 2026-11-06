@@ -30,7 +30,15 @@ export default function (pi: ExtensionAPI): void {
       return;
     }
 
-    const welcomeConfig = await loadWelcomeMessageConfig();
+    const { config: welcomeConfig, settingsMalformed } =
+      await loadWelcomeMessageConfig();
+
+    if (settingsMalformed) {
+      ui.notify(
+        "welcome-message: ~/.pi/agent/settings.json is malformed — using defaults",
+        "warning",
+      );
+    }
 
     if (event.reason === "new" && !welcomeConfig.showOnNewSession) {
       return;

@@ -57,7 +57,9 @@ type CwdContext = {
 };
 
 export default function (pi: ExtensionAPI) {
-  const notifyHerdr = loadNotifyHerdr();
+  // Loaded lazily on the first tool call: module-load time has no ctx to
+  // notify about malformed settings.
+  let notifyHerdr: boolean | null = null;
 
   pi.registerTool({
     name: TOOL_NAME,
@@ -79,6 +81,18 @@ export default function (pi: ExtensionAPI) {
     ) {
       const { question, options, allowCustom = false } = params;
       const { hasUI, ui } = ctx;
+
+      if (notifyHerdr === null) {
+        const settings = loadNotifyHerdr();
+        notifyHerdr = settings.value;
+
+        if (settings.malformed && hasUI) {
+          ui.notify(
+            "user-select: ~/.pi/agent/settings.json is malformed — using defaults",
+            "warning",
+          );
+        }
+      }
 
       if (options.length === 0) {
         throw new Error(`${TOOL_NAME}: at least one option required`);
